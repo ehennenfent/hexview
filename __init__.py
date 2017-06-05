@@ -21,7 +21,7 @@ class HexDisplay(QAbstractScrollArea):
             self.filename = filename
             self.data = open(filename, 'rb').read()
         else:
-            self.data = "This is a test data string ---- " + 'A'*32
+            self.data = ""
             self.filename = "<buffer>"
         self.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.charWidth = self.fontMetrics().width("2")
@@ -65,10 +65,18 @@ class HexDisplay(QAbstractScrollArea):
     def raw_data(self):
         return self.data
 
+    def clear(self):
+        self.data = ""
+
     def update_addr(self, addr, newval):
         length = len(self.data)
+        print("Writing",len(newval),"bytes at",addr)
+        if (addr > length):
+            raise ValueError("Attempted to display data outside the contiguous bounds of this memory segment!")
         part_one = self.data[0:(addr - self.starting_address)] + newval
         self.data = part_one + self.data[len(part_one):]
+        self.viewport().repaint()
+        self.adjust()
 
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
