@@ -51,6 +51,7 @@ class HexDisplay(QAbstractScrollArea):
         self.cursor.changed.connect(self.cursorMove)
         self.setMinimumWidth((self.code_start + self.bpl + 5) * self.charWidth)
         self.setMaximumWidth((self.code_start + self.bpl + 5) * self.charWidth)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.adjust()
 
     @property
@@ -65,8 +66,22 @@ class HexDisplay(QAbstractScrollArea):
     def raw_data(self):
         return self.data
 
+    def redraw(self):
+        self.viewport().repaint()
+        self.adjust()
+
     def clear(self):
         self.data = ""
+        self.redraw()
+
+    def set_new_offset(self, newoffset):
+        self.starting_address = newoffset
+        self.redraw()
+
+    def highlight_address(self, address, length):
+        select = Selection(address - self.starting_address, address - self.starting_address + length - 1)
+        self.highlights.append(select)
+        self.redraw()
 
     def update_addr(self, addr, newval):
         length = len(self.data)
@@ -75,8 +90,7 @@ class HexDisplay(QAbstractScrollArea):
             raise ValueError("Attempted to display data outside the contiguous bounds of this memory segment!")
         part_one = self.data[0:(addr - self.starting_address)] + newval
         self.data = part_one + self.data[len(part_one):]
-        self.viewport().repaint()
-        self.adjust()
+        self.redraw()
 
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
@@ -92,12 +106,6 @@ class HexDisplay(QAbstractScrollArea):
 
     def numLines(self):
         return int(ceil(float(len(self.raw_data))/ self.bpl))
-
-    def cursorRect(self):
-        return self.cursorToHexRect(self.cursor)
-
-    def cursorRect2(self):
-        return self.cursorToAsciiRect(self.cursor)
 
     def visibleColumns(self):
         ret = int(ceil(float(self.viewport().width())/self.charWidth))
@@ -156,21 +164,6 @@ class HexDisplay(QAbstractScrollArea):
         cx = line_index + self.code_start
         return (cx, cy)
 
-    def cursorToHexRect(self, cur):
-        hex_cx, hex_cy = self.indexToHexCharCoords(cur.address)
-        hex_cx += cur.nibble
-        hex_point = self.charToPxCoords(hex_cx, hex_cy)
-        hex_rect = QRect(hex_point, QSize(
-                           2, self.charHeight))
-        return hex_rect
-
-    def cursorToAsciiRect(self, cur):
-        ascii_cx, ascii_cy = self.indexToAsciiCharCoords(cur.address)
-        ascii_point = self.charToPxCoords(ascii_cx-1, ascii_cy)
-        ascii_rect = QRect(ascii_point, QSize(
-                           2, self.charHeight))
-        return ascii_rect
-
     def charAtCursor(self, cursor):
         code_char = self.raw_data[cursor.address]
         hexcode = "{:02x}".format(ord(code_char))
@@ -184,7 +177,6 @@ class HexDisplay(QAbstractScrollArea):
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() + y - self.visibleLines() + 4)
         if y < 4:
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() + y - 4)
-
 
     def mousePressEvent(self, event):
         cur = self.pxCoordToCursor(event.pos())
