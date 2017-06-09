@@ -91,7 +91,7 @@ class HexDisplay(QAbstractScrollArea):
 
     def update_addr(self, addr, newval):
         length = len(self.data)
-        print("Writing",len(newval),"bytes at", hex(addr))
+        # print("Writing",len(newval),"bytes at", hex(addr))
         if (addr > length):
             raise ValueError("Attempted to display data outside the contiguous bounds of this memory segment!")
         part_one = self.data[0:(addr - self.starting_address)] + newval
@@ -352,5 +352,5 @@ class HexDisplay(QAbstractScrollArea):
         painter.drawLine(code_start-charw, 0, code_start-charw, self.height())
 
         duration = time.time()-start
-        if duration > 0.04:
+        if duration > 0.06:
             print("painting took:", duration, 'seconds')
