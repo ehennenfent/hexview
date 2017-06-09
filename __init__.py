@@ -73,21 +73,21 @@ class HexDisplay(QAbstractScrollArea):
 
     def clear(self):
         self.data = ""
-        self.redraw()
+        # self.redraw()
 
     def set_new_offset(self, newoffset):
         self.starting_address = newoffset
-        self.redraw()
+        # self.redraw()
 
     def highlight_address(self, address, length, color=Qt.darkRed):
         select = NamedSelection(self, hex(address), address, address + length - 1, color)
         self.highlights.append(select)
-        self.redraw()
+        # self.redraw()
 
     def clear_highlight(self, address):
         adj_addr = address - self.starting_address
         self.highlights = [s for s in filter(lambda h: not h.contains(adj_addr), self.highlights)]
-        self.redraw()
+        # self.redraw()
 
     def update_addr(self, addr, newval):
         length = len(self.data)
@@ -96,7 +96,7 @@ class HexDisplay(QAbstractScrollArea):
             raise ValueError("Attempted to display data outside the contiguous bounds of this memory segment!")
         part_one = self.data[0:(addr - self.starting_address)] + newval
         self.data = part_one + self.data[len(part_one):]
-        self.redraw()
+        # self.redraw()
 
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
