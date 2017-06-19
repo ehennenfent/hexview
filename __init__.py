@@ -11,6 +11,8 @@ import time
 from cursor import *
 from selection import *
 
+dirtycolor = QColor(255, 153, 51)
+
 class HexDisplay(QAbstractScrollArea):
     """
     Modified from https://github.com/csarn/qthexedit/blob/master/hexwidget.py
@@ -24,11 +26,13 @@ class HexDisplay(QAbstractScrollArea):
         else:
             self.data = ""
             self.filename = "<buffer>"
+        self.old_data = self.data
         self.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.charWidth = self.fontMetrics().width("2")
         self.charHeight = self.fontMetrics().height()
         self.magic_font_offset = 2
         self.starting_address = starting_address
+        self.dirty = []
 
         self.viewport().setCursor(Qt.IBeamCursor)
         # constants
@@ -68,7 +72,8 @@ class HexDisplay(QAbstractScrollArea):
         return self.data
 
     def redraw(self):
-        self.viewport().repaint()
+        # self.viewport().repaint()
+        self.viewport().update()
         self.adjust()
 
     def clear(self):
@@ -76,7 +81,24 @@ class HexDisplay(QAbstractScrollArea):
         # self.redraw()
 
     def set_new_offset(self, newoffset):
-        self.starting_address = newoffset
+        old = self.starting_address
+        if(self.starting_address != newoffset):
+            print("Changing starting address from {0} to {1}".format(hex(self.starting_address), hex(newoffset)))
+            self.starting_address = newoffset
+        self.dirty = []
+        if(newoffset > old):
+            dif = newoffset - old
+            for l, r in zip(self.old_data[dif:], self.data):
+                self.dirty.append(l != r)
+        elif(newoffset < old): # Stack *growing*
+            dif = old - newoffset
+            for _ in range(dif):
+                self.dirty.append(True)
+            for l, r in zip(self.old_data, self.data[dif:]):
+                self.dirty.append(l != r)
+        else:
+            for l, r in zip(self.old_data, self.data):
+                self.dirty.append(l != r)
         # self.redraw()
 
     def highlight_address(self, address, length, color=Qt.darkRed):
@@ -95,8 +117,15 @@ class HexDisplay(QAbstractScrollArea):
         if (addr > length):
             raise ValueError("Attempted to display data outside the contiguous bounds of this memory segment!")
         part_one = self.data[0:(addr - self.starting_address)] + newval
-        self.data = part_one + self.data[len(part_one):]
+        #newdata = part_one + self.data[len(part_one):] # Overwrite, don't append
+        self.old_data = self.data
+        self.data = part_one #newdata
         # self.redraw()
+
+    def is_dirty(self, index):
+        if len(self.dirty) <= index:
+            return False
+        return self.dirty[index]
 
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
@@ -212,7 +241,6 @@ class HexDisplay(QAbstractScrollArea):
     def resizeEvent(self, event):
         self.adjust()
 
-
     def paintHighlight(self, painter, line, selection):
         if self.selection.active:
             cx_start_hex, cy_start_hex = self.indexToHexCharCoords(self.selection.start)
@@ -254,18 +282,24 @@ class HexDisplay(QAbstractScrollArea):
         byte = "{:02x}".format(ord(self.raw_data[addr]))
         size = QSize(self.charWidth*3, self.charHeight)
         rect = QRect(topleft, size)
-
+        dirty = self.is_dirty(addr)
         for sel in [self.selection] + self.highlights:
             if sel.active and sel.contains(addr):
                 painter.fillRect(rect, sel.color)
-                painter.setPen(self.palette().color(QPalette.HighlightedText))
+                if not dirty:
+                    painter.setPen(self.palette().color(QPalette.HighlightedText))
+                else:
+                    painter.setPen(dirtycolor)
                 painter.drawText(bottomleft, byte)
                 painter.setPen(self.palette().color(QPalette.WindowText))
                 break
         else:
             if row % 2 == 0:
                 painter.fillRect(rect, self.palette().color(QPalette.AlternateBase))
-            painter.setPen(self.palette().color(QPalette.WindowText))
+            if not dirty:
+                painter.setPen(self.palette().color(QPalette.WindowText))
+            else:
+                painter.setPen(dirtycolor)
             painter.drawText(bottomleft, byte)
 
 
@@ -276,18 +310,24 @@ class HexDisplay(QAbstractScrollArea):
         byte = self.toAscii(self.raw_data[addr])
         size = QSize(self.charWidth, self.charHeight)
         rect = QRect(topleft, size)
-
+        dirty = self.is_dirty(addr)
         for sel in [self.selection] + self.highlights:
             if sel.active and sel.contains(addr):
                 painter.fillRect(rect, sel.color)
-                painter.setPen(self.palette().color(QPalette.HighlightedText))
+                if not dirty:
+                    painter.setPen(self.palette().color(QPalette.HighlightedText))
+                else:
+                    painter.setPen(dirtycolor)
                 painter.drawText(bottomleft, byte)
                 painter.setPen(self.palette().color(QPalette.WindowText))
                 break
         else:
             if row % 2 == 0:
                 painter.fillRect(rect, self.palette().color(QPalette.AlternateBase))
-            painter.setPen(self.palette().color(QPalette.WindowText))
+            if not dirty:
+                painter.setPen(self.palette().color(QPalette.WindowText))
+            else:
+                painter.setPen(dirtycolor)
             painter.drawText(bottomleft, byte)
 
 
@@ -327,7 +367,7 @@ class HexDisplay(QAbstractScrollArea):
                 painter.fillRect(0, (i)*charh+self.magic_font_offset,
                                  self.viewport().width(), charh,
                                  self.palette().color(QPalette.AlternateBase))
-            (address, length, ascii) = line
+            (address, length, _ascii) = line
 
             data = self.raw_data[address:address+length]
 
@@ -343,7 +383,7 @@ class HexDisplay(QAbstractScrollArea):
             painter.setPen(self.palette().color(QPalette.WindowText))
 
             # hex data
-            for j, byte in enumerate(data):
+            for j, _byte in enumerate(data):
                 self.paintHex(painter, i, j)
                 self.paintAscii(painter, i, j)
 
