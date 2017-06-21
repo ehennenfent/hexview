@@ -83,7 +83,7 @@ class HexDisplay(QAbstractScrollArea):
     def set_new_offset(self, newoffset):
         old = self.starting_address
         if(self.starting_address != newoffset):
-            print("Changing starting address from {0} to {1}".format(hex(self.starting_address), hex(newoffset)))
+            # print("Changing starting address from {0} to {1}".format(hex(self.starting_address), hex(newoffset)))
             self.starting_address = newoffset
         self.dirty = []
         if(newoffset > old):
@@ -392,5 +392,5 @@ class HexDisplay(QAbstractScrollArea):
         painter.drawLine(code_start-charw, 0, code_start-charw, self.height())
 
         duration = time.time()-start
-        if duration > 0.06:
+        if duration > 0.1:
             print("painting took:", duration, 'seconds')
