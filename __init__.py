@@ -11,11 +11,17 @@ import time
 from cursor import *
 from selection import *
 
+# Use the same orange highlight for changed memory values
 dirtycolor = QColor(255, 153, 51)
 
 class HexDisplay(QAbstractScrollArea):
     """
     Modified from https://github.com/csarn/qthexedit/blob/master/hexwidget.py
+    Most of the dead code should be gone, but there could be something I missed.
+    Does all sorts of nasty unmaintanable things, but the most important thing
+    to know is that the memory contents are just stored as a string, and addresses
+    are 0-index internally, with the offset corresponding to the actual memory addresses
+    added after-the-fact during rendering.
     """
     selectionChanged = pyqtSignal()
     def __init__(self, parent=None, filename=None, starting_address=0):
@@ -31,8 +37,8 @@ class HexDisplay(QAbstractScrollArea):
         self.charWidth = self.fontMetrics().width("2")
         self.charHeight = self.fontMetrics().height()
         self.magic_font_offset = 2
-        self.starting_address = starting_address
-        self.dirty = []
+        self.starting_address = starting_address # Stores the memory address to start numbering from
+        self.dirty = [] # Stores whether a given byte should be highlighted
 
         self.viewport().setCursor(Qt.IBeamCursor)
         # constants
@@ -73,7 +79,7 @@ class HexDisplay(QAbstractScrollArea):
 
     def redraw(self):
         # self.viewport().repaint()
-        self.viewport().update()
+        self.viewport().update() # update is apparently cheaper than repaint
         self.adjust()
 
     def clear(self):
@@ -81,6 +87,8 @@ class HexDisplay(QAbstractScrollArea):
         # self.redraw()
 
     def set_new_offset(self, newoffset):
+        """ Sets a new starting offset. Has to be this complicated to make sure
+        highlighting doesn't get weird """
         old = self.starting_address
         if(self.starting_address != newoffset):
             # print("Changing starting address from {0} to {1}".format(hex(self.starting_address), hex(newoffset)))
@@ -102,16 +110,24 @@ class HexDisplay(QAbstractScrollArea):
         # self.redraw()
 
     def highlight_address(self, address, length, color=Qt.darkRed):
+        """ Uses named selections, which track absolute addresses instead of indexes.
+        This means this will move if the offset is changed, and that .contains will work
+        properly on addresses instead of indices. """
         select = NamedSelection(self, hex(address), address, address + length - 1, color)
         self.highlights.append(select)
         # self.redraw()
 
     def clear_highlight(self, address):
+        """ Deletes all the highlights that contain a given address """
         adj_addr = address - self.starting_address
         self.highlights = [s for s in filter(lambda h: not h.contains(adj_addr), self.highlights)]
         # self.redraw()
 
     def update_addr(self, addr, newval):
+        """ Updates the display. Works a lot better if you just pass in the entire
+        new block of memory at address 0x0 rather than try to be precise about it.
+        It strips off anything following the new memory, so updating in the above way
+        is probably in your best interest anyway."""
         length = len(self.data)
         # print("Writing",len(newval),"bytes at", hex(addr))
         if (addr > length):
@@ -123,10 +139,13 @@ class HexDisplay(QAbstractScrollArea):
         # self.redraw()
 
     def is_dirty(self, index):
+        """ Figures out if a given index was modified in the last update """
         if len(self.dirty) <= index:
             return False
         return self.dirty[index]
 
+    # I didn't write most of the following code, so I'm afraid it's mostly undocumented.
+    # However, it should continue to Just Work(TM) so long as the 0-based indexing scheme isn't messed up. 
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
 
@@ -392,5 +411,7 @@ class HexDisplay(QAbstractScrollArea):
         painter.drawLine(code_start-charw, 0, code_start-charw, self.height())
 
         duration = time.time()-start
-        if duration > 0.1:
+        if duration > 0.1: # reasonably this should be something like 1/60th of a second,
+        # but since we repaint the entire window frequently I don't think it's possible
+        # to get that fast without a substantial redesign.
             print("painting took:", duration, 'seconds')

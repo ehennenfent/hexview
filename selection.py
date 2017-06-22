@@ -39,6 +39,10 @@ class Selection(QObject):
         self._start = min(value, self.start)
 
 class NamedSelection(Selection):
+    """ This selection implementation adds the ability to store a name (which I don't actually use)
+    and a reference to the parent hexview, which introduces the distinct advantage of being able to
+    retrieve the offset of the start of the stack, which means that this selection can work on actual
+    memory addresses instead of indices in the 0-index scheme the hex viewer uses."""
     def __init__(self, parent, name, start_address, end_address, color=Qt.green):
         super(NamedSelection, self).__init__(start_address, end_address, True, color)
         self.parent = parent
@@ -47,7 +51,6 @@ class NamedSelection(Selection):
     def contains(self, address):
         return address >= (self._start - self.parent.starting_address) and address <= (self._end - self.parent.starting_address)
 
-    # enforce that start <= end
     @property
     def start(self):
         return self._start - self.parent.starting_address
