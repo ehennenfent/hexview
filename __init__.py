@@ -54,7 +54,7 @@ class HexDisplay(QAbstractScrollArea):
         self.pos = 0
         self.blink = False
 
-        self.selection = Selection(active=False, color=self.palette().color(QPalette.Highlight))
+        self.selection = Selection(active=False)
 
         self.highlights = []
         self._cursor = Cursor(32,1)
@@ -109,11 +109,11 @@ class HexDisplay(QAbstractScrollArea):
                 self.dirty.append(l != r)
         # self.redraw()
 
-    def highlight_address(self, address, length, color=Qt.darkRed):
+    def highlight_address(self, address, length, color=Qt.darkRed, name="*"):
         """ Uses named selections, which track absolute addresses instead of indexes.
         This means this will move if the offset is changed, and that .contains will work
         properly on addresses instead of indices. """
-        select = NamedSelection(self, hex(address), address, address + length - 1, color)
+        select = NamedSelection(self, name, address, address + length - 1, color)
         self.highlights.append(select)
         # self.redraw()
 
@@ -122,6 +122,19 @@ class HexDisplay(QAbstractScrollArea):
         adj_addr = address - self.starting_address
         self.highlights = [s for s in filter(lambda h: not h.contains(adj_addr), self.highlights)]
         # self.redraw()
+
+    def clear_named_highlight(self, name):
+        """ Deletes all the highlights with the given name """
+        new_highlights = []
+        for h in self.highlights:
+            if hasattr(h, 'name'):
+                if h.name == name:
+                    pass
+                else:
+                    new_highlights.append(h)
+            else:
+                new_highlights.append(h)
+        self.highlights = new_highlights
 
     def update_addr(self, addr, newval):
         """ Updates the display. Works a lot better if you just pass in the entire
@@ -145,7 +158,7 @@ class HexDisplay(QAbstractScrollArea):
         return self.dirty[index]
 
     # I didn't write most of the following code, so I'm afraid it's mostly undocumented.
-    # However, it should continue to Just Work(TM) so long as the 0-based indexing scheme isn't messed up. 
+    # However, it should continue to Just Work(TM) so long as the 0-based indexing scheme isn't messed up.
     def toAscii(self, string):
         return "".join([x if ord(x) >= 33 and ord(x) <= 126 else "." for x in string])
 
